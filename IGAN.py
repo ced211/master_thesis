@@ -1,11 +1,16 @@
 import tensorflow as tf
 
 
-class GAN:
+class IGAN:
     """"
     Class for inpainting magnitude spectrum. The previous frame, gap frame and subsequent frame MUST have the same dimension.
     """
     def __init__(self, input_shape, summary_writer, checkpoint_dir, fig_path):
+        """Build the GAN model
+        Input: - (Int, Int, Int) input_shape: dimension of the spectrum
+               - tf.Summary.SummaryWriter summary_writer: writer for the training log
+               - String checpoint_dir: path to the directory where the checkpoint are saved
+               - String fig_path: path to the directory where a generated sample will be saved at each epoch during the training"""
         self.input_shape = input_shape
         self.generator = self.create_generator()
         self.discriminator = self.create_discriminator()
