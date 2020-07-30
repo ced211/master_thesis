@@ -196,7 +196,7 @@ class IGAN:
             tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
             tf.summary.scalar('disc_loss', disc_loss, step=epoch)
 
-    def fit(self, train_ds, epochs, test_ds, starting_epoch=0):
+    def fit(self, train_ds, test_ds, epochs, starting_epoch=0):
         """train the network
         Input: - Processing train_ds: the training pipeline.
                - Int epochs: the number of epoch to train the network
