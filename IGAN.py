@@ -226,3 +226,4 @@ class IGAN:
         self.checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 
+

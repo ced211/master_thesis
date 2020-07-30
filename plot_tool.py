@@ -5,6 +5,7 @@ import scipy
 from librosa.display import specshow
 import librosa
 
+
 def plot_audio(rec_audio, true_audio, path):
     fig, ax = plt.subplots()
     ax.plot(np.arange(true_audio.size), true_audio, 'b-', label='true_audio')
@@ -12,16 +13,18 @@ def plot_audio(rec_audio, true_audio, path):
     plt.legend()
     plt.savefig(path)
 
+
 def plot_audios(rec_audio_batch, true_audio_batch, out_folder):
     for i in range(len(rec_audio_batch)):
         rec_audio = rec_audio_batch[i]
         true_audio = true_audio_batch[i]
-        path = out_folder + 'rec_vs_original_audio' + str(i) + '.png'
-        plot_audio(rec_audio, true_audio)
+        path = out_folder + 'rec_vs_original_audio_sample_' + str(i) + '.png'
+        plot_audio(rec_audio, true_audio, path)
+
 
 def plot_spectrum(rec_spec, true_spec, path):
-    rec_spec = np.swapaxes( 0, 1)
-    true_spec = np.swapaxes( 0, 1)
+    rec_spec = np.swapaxes(rec_spec, 0, 1)
+    true_spec = np.swapaxes(true_spec, 0, 1)
     rec_spec = tf.squeeze(rec_spec)
     true_spec = tf.squeeze(true_spec)
     fig, axes = plt.subplots(ncols=3)
@@ -46,7 +49,15 @@ def plot_spectrum(rec_spec, true_spec, path):
     plt.savefig(path)
     plt.close()
 
-def plot_spectrums(rec_spec_batch, true_spec_batch, out_folder, sr=None, hop_length=None):
+
+def plot_spectrums(rec_spec_batch, true_spec_batch, out_folder):
     for i in range(rec_spec_batch.shape[0]):
         path = out_folder + 'rec_vs_original_spectrum_sample_' + str(i) + '.png'
-        plot_spectrum(rec_spec_batch[i], true_spec_batch[i])
+        plot_spectrum(rec_spec_batch[i], true_spec_batch[i], path)
+
+
+def write_audio_batch(rec_audios, true_audios, out_folder, sr):
+    for i in range(rec_audios.shape[0]):
+        path = out_folder + '_sample_' + str(i)
+        scipy.io.wavfile.write(path + '_sample_' + str(i) + '.wav', sr, rec_audios[i])
+        scipy.io.wavfile.write(path + '_sample_' + str(i) + '.wav', sr, true_audios[i])

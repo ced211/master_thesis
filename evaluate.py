@@ -15,7 +15,7 @@ def mkdir(dir):
     return
 
 
-def _eval(model, gen, folder, plot=True):
+def _eval(model, gen, folder, plot=False):
     result = model.evaluate(gen)
     old_get_audio = gen.get_audio
     if isinstance(result, list):
@@ -33,10 +33,9 @@ def _eval(model, gen, folder, plot=True):
         pred = model.predict_on_batch(x)
         rec = gen.to_audio(pred)
         print("writing batch " + str(i))
+        rec_audio = gen.to_audio(pred)
+        SNR_audio.append(snr_audio_batch(np.squeeze(true_audio), np.squeeze(rec_audio)))
         if plot:
-            for j in range(len(x.shape[0])):
-                scipy.io.wavfile.write(folder + 'rec_' + 'batch_' + str(i) + '_sample_' + str(j) + '.wav', sr, rec[j])
-                scipy.io.wavfile.write(folder + 'original_' + 'batch_' + str(i) + '_sample_' + str(j) + '.wav', sr, true[j])
             if gen.prediction:
                 predicted = pred
                 truth = y
@@ -44,10 +43,10 @@ def _eval(model, gen, folder, plot=True):
                 prev, next = x
                 predicted = np.concatenate((prev, pred, next), axis=1)
                 truth = np.concatenate((prev, y, next), axis=1)
-                prefix = folder + 'batch_' + str(i) + '_'
-            plot_spectrum(predicted, truth, prefix, sr=gen.sr, hop_length=gen._nhop)
-        rec_audio = gen.to_audio(pred)
-        SNR_audio.append(snr_audio_batch(np.squeeze(true_audio), np.squeeze(rec_audio)))
+            prefix = folder + 'batch_' + str(i) + '_'
+            plot_spectrums(predicted, truth, prefix)
+            plot_audios(rec_audio, y, prefix)
+            write_audio_batch(rec_audio, y, prefix, gen.sr)
     SNR_audio = np.stack(SNR_audio)
     plt.hist(SNR_audio)
     plt.savefig(folder + "_snr_histogram.png")
