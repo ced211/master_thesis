@@ -3,12 +3,11 @@ import numpy as np
 import librosa
 import scipy
 from metrics import log
-from specgrams_helper import SpecgramsHelper
 from metrics import *
 import math
+import SpecgramsHelper
 
-
-class Processeur(SpecgramsHelper, tf.keras.utils.Sequence):
+class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
 
     def __init__(self, sr, dataset, dataset_length, audio_length, window_size=0.040, overlap=0.75, get_audio=False, prediction_only=False):
         """
@@ -23,7 +22,6 @@ class Processeur(SpecgramsHelper, tf.keras.utils.Sequence):
             - Boolean get_audio: Whether to also get the audio when calling self.__getitem__().
             - Boolean prediction only: Whether to give the next frame. True for prediction and false for inpainting.
         """
-        self.frame_size = frame_size
         window_size = int(sr * window_size)
         self.length = dataset_length
         self.dataset_ite = iter(dataset)
@@ -36,17 +34,8 @@ class Processeur(SpecgramsHelper, tf.keras.utils.Sequence):
         self.audio_length = int(audio_length)
         self.prediction = prediction_only
         # init specgram helper
-        ifreq = False
-        if process_name == 'ifreq':
-            ifreq = True
         super().__init__(window_size, hop_size, overlap=overlap,
                          sample_rate=sr)
-        if normalize and self.norm_process == 'standarize':
-            self.mean, self.std = self.fit_normalize()
-            self.normalize = True
-        elif normalize and self.norm_process == 'minmax':
-            self.min, self.max = self.fit_normalize()
-            self.normalize = True
 
     def process_data(self, batch):
         return self.waves_to_lin_spectrum(tf.expand_dims(batch, -1))

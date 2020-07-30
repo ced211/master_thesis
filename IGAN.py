@@ -1,6 +1,11 @@
 import tensorflow as tf
-
-
+from tensorflow.keras.layers import *
+from tensorflow.keras.models import *
+import os
+import time
+import matplotlib.pyplot as plt
+import librosa.display
+import numpy as np
 class IGAN:
     """"
     Class for inpainting magnitude spectrum. The previous frame, gap frame and subsequent frame MUST have the same dimension.
@@ -134,6 +139,7 @@ class IGAN:
         total_gen_loss = gan_loss + (LAMBDA * l1_loss)
         return total_gen_loss, gan_loss, l1_loss
 
+
     def generate_images(self, prev_frame, gap_frame, next_frame, epoch):
         """
         Create and save sample image of the generator prediction and ground truth.
@@ -170,7 +176,6 @@ class IGAN:
                - Tensor next frame: batch of conditioning image, the frame subsequent of the one to inpaint.
                - Int epoch: the current epoch"""
 
-        #compute gradient
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             gen_output = self.generator([prev_frame, next_frame], training=True)
             disc_real_output = self.discriminator([prev_frame, gap_frame, next_frame], training=True)
@@ -179,7 +184,6 @@ class IGAN:
                                                                             gap_frame)
             disc_loss = self.discriminator_loss(disc_real_output, disc_generated_output)
 
-        #Apply gradient
         generator_gradients = gen_tape.gradient(gen_total_loss,
                                                 self.generator.trainable_variables)
         discriminator_gradients = disc_tape.gradient(disc_loss,
@@ -188,13 +192,7 @@ class IGAN:
                                                      self.generator.trainable_variables))
         self.discriminator_optimizer.apply_gradients(zip(discriminator_gradients,
                                                          self.discriminator.trainable_variables))
-
-        #Write log
-        with self.summary_writer.as_default():
-            tf.summary.scalar('gen_total_loss', gen_total_loss, step=epoch)
-            tf.summary.scalar('gen_gan_loss', gen_gan_loss, step=epoch)
-            tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
-            tf.summary.scalar('disc_loss', disc_loss, step=epoch)
+        return tf.math.reduce_mean(gen_total_loss), tf.math.reduce_mean(gen_gan_loss), tf.math.reduce_mean(gen_l1_loss), tf.math.reduce_mean(disc_loss)
 
     def fit(self, train_ds, test_ds, epochs, starting_epoch=0):
         """train the network
@@ -209,11 +207,28 @@ class IGAN:
             self.generate_images(prev_frame, gap_frame, next_frame, epoch)
 
             # Train
+            gen_total_loss = 0
+            gen_gan_loss = 0
+            gen_l1_loss = 0
+            disc_loss = 0
             for i in range(len(train_ds)):
                 (prev_frame, next_frame), gap_frame = train_ds.__getitem__(i)
-                self.distributed_train_step(prev_frame, gap_frame, next_frame, epoch)
+                gloss, ggan, l1loss, dcloss = self.train_step(prev_frame, gap_frame, next_frame, epoch)
+                gen_total_loss += gloss
+                gen_gan_loss += ggan
+                gen_l1_loss += l1loss
+                disc_loss += dcloss
                 print(str(i) + ' batch done out of' + str(len(train_ds)))
             self.checkpoint.save(file_prefix=self.checkpoint_prefix)
+            gen_total_loss /= len(train_ds)
+            gen_gan_loss /= len(train_ds)
+            gen_l1_loss /= len(train_ds)
+            disc_loss /= len(train_ds)
+            with self.summary_writer.as_default():
+                tf.summary.scalar('gen_total_loss', gen_total_loss, step=epoch)
+                tf.summary.scalar('gen_gan_loss', gen_gan_loss, step=epoch)
+                tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
+                tf.summary.scalar('disc_loss', disc_loss, step=epoch)
             print('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time() - start))
 
     def restore(self, checkpoint_dir=None):
