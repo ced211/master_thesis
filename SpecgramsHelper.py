@@ -106,7 +106,7 @@ class SpecgramsHelper(object):
             - Tensor waves: float tensor of shape [batch, time, 1]"""
         spectrum = tf.convert_to_tensor(spectrum)
         S =  spectrum[:, :, :, 0]
-        phase_angle = self.custom_griffinlim(S, 100)
+        phase_angle = self.griffinlim(S, 100)
         return self.stfts_to_waves(tf.expand_dims(polar2rect(S, phase_angle), -1)).numpy()
 
     # Adapted from: https://github.com/librosa/librosa/blob/main/librosa/core/spectrum.py

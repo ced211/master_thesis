@@ -10,7 +10,7 @@ class IGAN:
     """"
     Class for inpainting magnitude spectrum. The previous frame, gap frame and subsequent frame MUST have the same dimension.
     """
-    def __init__(self, input_shape, summary_writer, checkpoint_dir, fig_path):
+    def __init__(self, input_shape, checkpoint_dir, summary_writer=None, fig_path=None):
         """Build the GAN model
         Input: - (Int, Int, Int) input_shape: dimension of the spectrum
                - tf.Summary.SummaryWriter summary_writer: writer for the training log
@@ -140,7 +140,7 @@ class IGAN:
         return total_gen_loss, gan_loss, l1_loss
 
 
-    def generate_images(self, prev_frame, gap_frame, next_frame, epoch):
+    def generate_images(self, prev_frame, gap_frame, next_frame, epoch, folder=None):
         """
         Create and save sample image of the generator prediction and ground truth.
         Label the saved image with the epoch in the filename.
@@ -149,6 +149,13 @@ class IGAN:
                - Tensor gap frame: the ground truth, the frame to be inpainted.
                - Tensor next frame: batch of conditioning image, the frame subsequent of the one to inpaint.
         """
+
+        if self.fig_path is None and folder is None:
+            print("No folder specify. Please specify the folder in which the generated image should be saved in the "
+                  "arg folder or when initializing the object")
+            return
+        if folder is None:
+            folder = self.fig_path
         self.generator.summary()
         prediction = self.generator([prev_frame, next_frame], training=True)
 
@@ -165,11 +172,11 @@ class IGAN:
         librosa.display.specshow(librosa.amplitude_to_db(np.transpose(np.squeeze(gap_frame[0])), ref=np.max), ax=ax2,
                                  y_axis='log',
                                  x_axis='frames')
-        plt.savefig(self.fig_path + '_' + str(epoch) + '.png')
+        plt.savefig(folder + '_' + str(epoch) + '.png')
         plt.close()
 
     @tf.function
-    def train_step(self, prev_frame, gap_frame, next_frame, epoch):
+    def train_step(self, prev_frame, gap_frame, next_frame):
         """Perform one epoch of training
         Input: - Tensor prev_frame: batch of conditioning image, the frame just before the one to inpaint.
                - Tensor gap frame: the ground truth, the frame to be inpainted.
@@ -213,7 +220,7 @@ class IGAN:
             disc_loss = 0
             for i in range(len(train_ds)):
                 (prev_frame, next_frame), gap_frame = train_ds.__getitem__(i)
-                gloss, ggan, l1loss, dcloss = self.train_step(prev_frame, gap_frame, next_frame, epoch)
+                gloss, ggan, l1loss, dcloss = self.train_step(prev_frame, gap_frame, next_frame)
                 gen_total_loss += gloss
                 gen_gan_loss += ggan
                 gen_l1_loss += l1loss
@@ -224,11 +231,12 @@ class IGAN:
             gen_gan_loss /= len(train_ds)
             gen_l1_loss /= len(train_ds)
             disc_loss /= len(train_ds)
-            with self.summary_writer.as_default():
-                tf.summary.scalar('gen_total_loss', gen_total_loss, step=epoch)
-                tf.summary.scalar('gen_gan_loss', gen_gan_loss, step=epoch)
-                tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
-                tf.summary.scalar('disc_loss', disc_loss, step=epoch)
+            if self.summary_writer is not None:
+                with self.summary_writer.as_default():
+                    tf.summary.scalar('gen_total_loss', gen_total_loss, step=epoch)
+                    tf.summary.scalar('gen_gan_loss', gen_gan_loss, step=epoch)
+                    tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
+                    tf.summary.scalar('disc_loss', disc_loss, step=epoch)
             print('Time taken for epoch {} is {} sec\n'.format(epoch + 1, time.time() - start))
 
     def restore(self, checkpoint_dir=None):

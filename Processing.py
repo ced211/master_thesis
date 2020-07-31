@@ -38,11 +38,31 @@ class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
                          sample_rate=sr)
 
     def process_data(self, batch):
+        """"Process the audio batch and transform it into feature
+        Input:
+            - Tensor batch: batch of audio to process
+        Output:
+            - Tensor processed_data: spectrum of shape [batch, time, freq, 1]"""
         return self.waves_to_lin_spectrum(tf.expand_dims(batch, -1))
 
     def __getitem__(self, item):
         """Give a batch of:
-            ((spec1, spec3) spec2) where spec are formed from the audio sliced in three part"""
+            x, y, true_audio if self.get_audio == True
+            or x, y if self.get_audio == False.
+            x is the neural network input and y its target.
+            x = (specs1, specs3) in case of inpainting, when self.prediction_only == false
+            x = specs1 in caseof prediction, when self.prediction_only == true
+            y = specs2
+        Input:
+            - Int item: unused
+        Output:
+            - Tensor spec1 : spectrum of the first third of the audios
+            - Tensor spec2: spectrum of the second third of the audios
+            - Tensor specs3: spectrum of the last third of the audios
+            - Tensor true_audio: the waveform of the second third of the audio
+        Note:
+            - The audio are the ones inside the dataset given during the object creation
+            """
         audio_batch = next(self.dataset_ite)
         audio1 = audio_batch[:, 0:self.audio_length]
         audio2 = audio_batch[:, self.audio_length: 2 * self.audio_length]
@@ -62,7 +82,15 @@ class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
                 return specs1, specs2, audio2
 
     def __len__(self):
+        """Return the number of batch in one epoch
+        Output:
+            - Int nb_batch: number of batch in one epoch"""
         return self.length
 
     def to_audio(self, spectrum_batch):
+        """Convert spectrum back to audio. Use Griffinlin for phase estimation.
+        Input:
+            - Tensor spectrum: spectrum to convert
+        Output:
+            - Tensor audio: batch of reconstructed audio"""
         return self.lin_spectrum_to_waves(spectrum_batch)
