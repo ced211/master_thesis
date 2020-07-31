@@ -5,7 +5,7 @@ import IGAN
 import Processing
 import os
 import datetime
-
+import PGAN
 
 def mkdir(path):
     """Create a directory if it doesn't exist. Do nothing Otherwise
@@ -20,7 +20,7 @@ def mkdir(path):
     return
 
 
-def create_pipeline(data_path, batch_size, audio_frame_length):
+def create_pipeline(data_path, batch_size, audio_frame_length, prediction_only):
     """Create a pipeline to pre and post process the data.
     Inputs:
         - String data_path: path to the tfrecord file
@@ -33,7 +33,7 @@ def create_pipeline(data_path, batch_size, audio_frame_length):
     data_loader = DataLoader.LoadData(data_path, sr=16000, batch_size=batch_size, audio_frame_length=audio_frame_length)
     dataset = data_loader.create_dataset()
     pipeline = Processing.Processeur(data_loader.sr, dataset, data_loader.length, audio_frame_length, window_size=0.025,
-                                     overlap=0.75)
+                                     overlap=0.75, prediction_only=prediction_only)
     return pipeline, data_loader.sr
 
 
@@ -75,7 +75,7 @@ def set_option():
     args = parser.parse_args()
 
     # default value
-    model_name = 'igan'
+    model_name = 'pgan'
     train_path = '../fma_dataset/train.tfrecord'
     val_path = '../fma_dataset/val.tfrecord'
     test_path = '../fma_dataset/test.tfrecord'
@@ -129,6 +129,11 @@ def init_model(ckpt, pipeline, model_name, log_path=None):
         model = IGAN.IGAN(input_shape=sample.get_shape(), checkpoint_dir=ckpt, summary_writer=summary_writer,
                           fig_path=fig_path)
         model.restore(ckpt)
+    if model_name == 'pgan':
+        sample = pipeline.__getitem__(1)[0][0]
+        model = PGAN.PGAN(input_shape=sample.get_shape(), checkpoint_dir=ckpt, summary_writer=summary_writer,
+                          fig_path=fig_path)
+        model.restore(ckpt)
     if model is None:
         print("Unkown model name")
     return model
@@ -139,9 +144,14 @@ if __name__ == "__main__":
     train_path, val_path, test_path, audio_length, batch_size, log_path, epoch, model_name, ckpt = set_option()
 
     # Create pipeline
-    train_pipeline, sr = create_pipeline(train_path, batch_size, audio_length)
-    val_pipeline, sr = create_pipeline(val_path, batch_size, audio_length)
-    test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length)
+    if model_name == 'igan':
+        train_pipeline, sr = create_pipeline(train_path, batch_size, audio_length, prediction_only=False)
+        val_pipeline, sr = create_pipeline(val_path, batch_size, audio_length, prediction_only=False)
+        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=False)
+    else:
+        train_pipeline, sr = create_pipeline(train_path, batch_size, audio_length, prediction_only=True)
+        val_pipeline, sr = create_pipeline(val_path, batch_size, audio_length, prediction_only=True)
+        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=True)
     model = init_model(ckpt, test_pipeline, model_name, log_path)
     if model is not None:
         model.fit(train_pipeline, val_pipeline, epoch, 0)

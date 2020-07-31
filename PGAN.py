@@ -6,7 +6,7 @@ import time
 import matplotlib.pyplot as plt
 import librosa.display
 import numpy as np
-class IGAN:
+class PGAN:
     """"
     Class for inpainting magnitude spectrum. The previous frame, gap frame and subsequent frame MUST have the same dimension.
     """
@@ -79,24 +79,19 @@ class IGAN:
         Output: tf.keras.Model """
         encoder = self.create_encoder(name='encoder')
         spec1 = tf.keras.Input(shape=self.input_shape)
-        spec3 = tf.keras.Input(shape=self.input_shape)
 
         spec1_encoded = encoder(spec1)
-        spec3_encoded = encoder(spec3)
-
-        dec_input = Concatenate()([spec1_encoded, spec3_encoded])
+        dec_input = spec1_encoded
         decoder = self.create_decoder(dec_input.shape[1:])
         prediction = decoder(dec_input)
-        return tf.keras.Model([spec1, spec3], prediction)
+        return tf.keras.Model(spec1, prediction)
 
     def create_discriminator(self):
         """Build the discriminator part of the GAN.
         Output: tf.keras.Sequential """
         prev_frame = tf.keras.layers.Input(shape=self.input_shape, name='prev_frame')
-        next_frame = tf.keras.layers.Input(shape=self.input_shape, name='next_frame')
         rec_frame = tf.keras.layers.Input(shape=self.generator.layers[-1].output_shape[1:], name='rec_frame')
-        input = tf.concat([prev_frame, rec_frame, next_frame], axis=1)
-        print(tf.shape(input))
+        input = tf.concat([prev_frame, rec_frame], axis=1)
 
         base = 32
         disc = tf.keras.Sequential([
@@ -110,7 +105,7 @@ class IGAN:
                    activation="sigmoid", padding='same'),
         ], name="discriminator")
         last = disc(input)
-        return tf.keras.Model(inputs=[prev_frame, rec_frame, next_frame], outputs=last, name="discriminator")
+        return tf.keras.Model(inputs=[prev_frame, rec_frame], outputs=last, name="discriminator")
 
     def discriminator_loss(self, disc_real_output, disc_generated_output):
         """"Compute the discriminator loss:
@@ -140,7 +135,7 @@ class IGAN:
         return total_gen_loss, gan_loss, l1_loss
 
 
-    def generate_images(self, prev_frame, gap_frame, next_frame, epoch, folder=None):
+    def generate_images(self, prev_frame, gap_frame, epoch, folder=None):
         """
         Create and save sample image of the generator prediction and ground truth.
         Label the saved image with the epoch in the filename.
@@ -157,7 +152,7 @@ class IGAN:
         if folder is None:
             folder = self.fig_path
         self.generator.summary()
-        prediction = self.generator([prev_frame, next_frame], training=True)
+        prediction = self.generator(prev_frame, training=True)
 
         plt.figure()
         fig, axes = plt.subplots(ncols=2)
@@ -176,7 +171,7 @@ class IGAN:
         plt.close()
 
     @tf.function
-    def train_step(self, prev_frame, gap_frame, next_frame):
+    def train_step(self, prev_frame, gap_frame):
         """Perform one epoch of training
         Input: - Tensor prev_frame: batch of conditioning image, the frame just before the one to inpaint.
                - Tensor gap frame: the ground truth, the frame to be inpainted.
@@ -184,9 +179,9 @@ class IGAN:
                - Int epoch: the current epoch"""
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            gen_output = self.generator([prev_frame, next_frame], training=True)
-            disc_real_output = self.discriminator([prev_frame, gap_frame, next_frame], training=True)
-            disc_generated_output = self.discriminator([prev_frame, gen_output, next_frame], training=True)
+            gen_output = self.generator(prev_frame, training=True)
+            disc_real_output = self.discriminator([prev_frame, gap_frame], training=True)
+            disc_generated_output = self.discriminator([prev_frame, gen_output], training=True)
             gen_total_loss, gen_gan_loss, gen_l1_loss = self.generator_loss(disc_generated_output, gen_output,
                                                                             gap_frame)
             disc_loss = self.discriminator_loss(disc_real_output, disc_generated_output)
@@ -210,8 +205,8 @@ class IGAN:
         for epoch in range(epochs):
             epoch = epoch + starting_epoch
             start = time.time()
-            (prev_frame, next_frame), gap_frame = test_ds.__getitem__(0)
-            self.generate_images(prev_frame, gap_frame, next_frame, epoch)
+            prev_frame, gap_frame = test_ds.__getitem__(0)
+            self.generate_images(prev_frame, gap_frame, epoch)
 
             # Train
             gen_total_loss = 0
@@ -219,8 +214,8 @@ class IGAN:
             gen_l1_loss = 0
             disc_loss = 0
             for i in range(len(train_ds)):
-                (prev_frame, next_frame), gap_frame = train_ds.__getitem__(i)
-                gloss, ggan, l1loss, dcloss = self.train_step(prev_frame, gap_frame, next_frame)
+                prev_frame, gap_frame = train_ds.__getitem__(i)
+                gloss, ggan, l1loss, dcloss = self.train_step(prev_frame, gap_frame)
                 gen_total_loss += gloss
                 gen_gan_loss += ggan
                 gen_l1_loss += l1loss

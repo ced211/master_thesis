@@ -41,7 +41,7 @@ def _eval(model, gen, folder, sr, plot=False):
             prefix = folder + 'batch_' + str(i) + '_'
             plot_spectrums(predicted, truth, prefix, sr, gen._nhop)
             plot_audios(rec_audio, true_audio.numpy(), prefix)
-            write_audio_batch(rec_audio, true_audio.numpy(), 'rec' + prefix, gen.sr)
+            write_audio_batch(rec_audio, true_audio.numpy(), prefix, gen.sr)
 
     SNR_audio = np.stack(SNR_audio)
     plt.hist(SNR_audio)
