@@ -40,7 +40,7 @@ class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
     def process_data(self, batch):
         """"Process the audio batch and transform it into feature
         Input:
-            - Tensor batch: batch of audio to process
+            - Tensor batch: batch of audio to process of shape [batch, time]
         Output:
             - Tensor processed_data: spectrum of shape [batch, time, freq, 1]"""
         return self.waves_to_lin_spectrum(tf.expand_dims(batch, -1))

@@ -7,7 +7,7 @@
 %The result will be saved in the res_dir (can be changed) file
 
 regex = 'or*.wav'
-audio_folder ='../reconstruction/fma/gan/gap_length128ms/cnn/prediction/percept_eval/';
+audio_folder ='../reconstruction/pgan/0.192/percept_eval';
 pqfolder = 'PQevalAudio'
 files = dir(fullfile(audio_folder, regex))
 target_sr = 48000

@@ -1,30 +1,33 @@
 import tensorflow as tf
-import LoadData
+import DataLoader
 import scipy
 import PGAN
 import IGAN
-from train import create_pipeline, init_model
+from train import create_pipeline, init_model, mkdir
+import argparse
+
 
 class Percept_eval():
     def __init__(self, model, result_directory, sr):
-        self.model = model
-        self.slice_size = model.layers[-1].output_shape[1]
+        self.model = model.generator
+        self.slice_size = self.model.layers[-1].output_shape[1]
         self.res_dir = result_directory
         self.sr = sr
-        print(self.slice_size)
-
+        if isinstance(model, IGAN.IGAN):
+            self.model_name ='igan'
+        if isinstance(model, PGAN.PGAN):
+            self.model_name ='pgan'
     def pred_spec_chaining(self, spectrum):
         """Split the spectrum on slice of slice size and perform prediction on each spectrum slice given the adjacent slice."""
-        print("spectrum shape: " + str(tf.shape(spectrum)))
         shape = spectrum.shape
         idx_to_keep = shape[0] - shape[0] % self.slice_size
         spectrum = spectrum[:idx_to_keep, :, :]
         prev = tf.stack(tf.split(spectrum, shape[0] // self.slice_size), axis=0)
         next = prev[2:]
         prev = prev[:tf.shape(next)[0], :, :, :]
-        if isinstance(self.model, IGAN):
+        if self.model_name == 'igan':
             predictions = self.model.predict((prev, next))
-        if isinstance(self.model, PGAN):
+        if self.model_name == 'pgan':
             predictions = self.model.predict(prev)
         out = predictions.reshape((tf.shape(predictions)[0] * tf.shape(predictions)[1], shape[1], 1))
         return out
@@ -54,14 +57,12 @@ class Percept_eval():
         for audio_batch in dataset:
             batch_spec = gen.process_data(tf.expand_dims(audio_batch, -1))
             predictions = tf.map_fn(self.eval_audio, batch_spec)
-            print("prediction shape: " + str(tf.shape(predictions)))
             reconstructed_audio = gen.to_audio(predictions)
             reconstructed_audio = tf.squeeze(reconstructed_audio)
             idx0 = self.slice_size * spec_helper._nhop
             idx1 = audio_batch.shape[1] - self.slice_size * spec_helper._nhop - spec_helper._nhop * (
                     batch_spec[0].shape[0] % self.slice_size)
             audio_batch = audio_batch[:, idx0:idx1]
-            print("audio batch shape: " + str(tf.shape(audio_batch)))
 
             self.write_batch(reconstructed_audio, audio_batch, batch_idx)
 
@@ -74,14 +75,13 @@ class Percept_eval():
         batch_idx = 0
         for audio_batch in dataset:
             or_audio = audio_batch[:, :idx_to_keep]
-            print(tf.shape(or_audio))
             prev_frame = audio_batch[:, hole_start_idx - frame_length:hole_start_idx]
-            prev_frame = gen.process_data(tf.expand_dims(prev_frame, -1))
-            if isinstance(self.model, IGAN):
+            prev_frame = gen.process_data(tf.squeeze(prev_frame))
+            if self.model_name == 'igan':
                 next_frame = audio_batch[:, hole_start_idx - frame_length:hole_start_idx]
-                next_frame = gen.process_data(tf.expand_dims(next_frame, -1))
+                next_frame = gen.process_data(tf.squeeze(next_frame))
                 predictions = self.model.predict((prev_frame, next_frame))
-            if isinstance(self.model, PGAN):
+            if self.model_name == 'pgan':
                 predictions = self.model.predict(prev_frame)
             predictions = gen.to_audio(predictions)
             rec_audio = tf.concat(
@@ -93,28 +93,51 @@ class Percept_eval():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     help_ = "Path to Checkpoint folder"
-    parser.add_argument("ckpt", help=help_)
+    parser.add_argument("-c", "--ckpt", help=help_)
     help_ = "Model type. choose between igan or pgan"
-    parser.add_argument("model", help=help_)
+    parser.add_argument("-m", "--model", help=help_)
     help_ = "path to data"
-    parser.add_argument("data", help=help_)
+    parser.add_argument("-d", "--data", help=help_)
     help_ = "target directory"
-    parser.add_argument("target", help=help_)
+    parser.add_argument("-t", "--target", help=help_)
     help_ = "Evaluation type: choose between chaining or single_hole"
-    parser.add_argument("method", help=help_)
+    parser.add_argument("-me", "--method", help=help_)
+    help_ = "audio frame length"
+    parser.add_argument("-l", "--length", help=help_)
     args = parser.parse_args()
 
+    #Default value
+    model_name = 'pgan'
+    if args.model:
+        model_name = args.model
+    data = '../fma_dataset/test.tfrecord'
+    if args.data:
+        data = args.data
+    ckpt = 'ckpt/' + model_name + '/0.192/'
+    if args.ckpt:
+        ckpt = args.ckpt
+    target = './reconstruction/' + ckpt[4:] + 'percept_eval/'
+    mkdir(target)
+    if args.target:
+        target = args.target
+    method = "single_hole"
+    if args.method:
+        method = args.method
     pipeline = None
     sr= 16000
-    if args.model_name == 'igan':
-        pipeline, sr = create_pipeline(args.data, 256, 2.0, prediction_only=False)
-    if args.model_name == 'pgan':
-        pipeline, sr = create_pipeline(args.data, 256, 2.0, prediction_only=True)
-    model = init_model(args.ckpt, pipeline, args.model_name)
-    evaluator = Percept_eval(model, args.target, sr)
-    dataloader = LoadData(args.data, repeat=False, audio_frame_length=2.01, batch_size=256)
+    split_ckpt = ckpt.split('/')
+    audio_length = float(split_ckpt[2])
+    if args.length:
+        audio_length = args.length
+    if model_name == 'igan':
+        pipeline, sr = create_pipeline(data, 256, audio_length, prediction_only=False)
+    if model_name == 'pgan':
+        pipeline, sr = create_pipeline(data, 256, audio_length, prediction_only=True)
+    model = init_model(ckpt, pipeline, model_name)
+    evaluator = Percept_eval(model, target, sr)
+    dataloader = DataLoader.LoadData(data, repeat=False, audio_frame_length=2.01, batch_size=256)
     dataset = dataloader.create_dataset()
-    if args.method == 'chaining':
+    if method == 'chaining':
         evaluator.prediction_chaining(dataset, pipeline)
-    if args.method == 'single_hole':
+    if method == 'single_hole':
         evaluator.eval_on_1_hole(dataset, pipeline)

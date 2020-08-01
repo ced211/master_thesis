@@ -31,6 +31,7 @@ def _eval(model, gen, folder, sr, plot=False):
         print(rec_audio.shape)
         SNR_audio.append(snr_audio_batch(np.squeeze(true_audio), np.squeeze(rec_audio)))
         if plot:
+            prefix = folder + 'batch_' + str(i) + '_'
             if gen.prediction:
                 predicted = pred
                 truth = y
@@ -38,8 +39,7 @@ def _eval(model, gen, folder, sr, plot=False):
                 prev, next = x
                 predicted = np.concatenate((prev, pred, next), axis=1)
                 truth = np.concatenate((prev, y, next), axis=1)
-            prefix = folder + 'batch_' + str(i) + '_'
-            plot_spectrums(predicted, truth, prefix, sr, gen._nhop)
+            plot_spectrums(predicted, truth, prefix, sr, gen._nhop, gen.prediction)
             plot_audios(rec_audio, true_audio.numpy(), prefix)
             write_audio_batch(rec_audio, true_audio.numpy(), prefix, gen.sr)
 
@@ -87,7 +87,10 @@ def evaluate(trained_model, config):
 
 if __name__ == "__main__":
     train_path, val_path, test_path, audio_length, batch_size, log_path, epoch, model_name, ckpt = set_option()
-    test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length)
+    if model_name == 'pgan':
+        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=True)
+    if model_name == 'igan':
+        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=False)
     model = init_model(ckpt, test_pipeline, model_name, log_path)
     res_dir = 'reconstruction/' + model_name + '/' + str(audio_length) + '/'
     config = {

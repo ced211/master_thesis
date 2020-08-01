@@ -75,7 +75,7 @@ def set_option():
     args = parser.parse_args()
 
     # default value
-    model_name = 'pgan'
+    model_name = 'igan'
     train_path = '../fma_dataset/train.tfrecord'
     val_path = '../fma_dataset/val.tfrecord'
     test_path = '../fma_dataset/test.tfrecord'
@@ -87,6 +87,8 @@ def set_option():
     mkdir(log_path)
     mkdir(ckpt_path)
 
+    if args.model:
+        model_name = args.model
     if args.train:
         train_path = args.train
     if args.val:
@@ -118,6 +120,7 @@ def init_model(ckpt, pipeline, model_name, log_path=None):
     """
     fig_path = None
     model = None
+    summary_writer=None
     if log_path is not None:
         # create summary writer
         summary_writer = tf.summary.create_file_writer(
