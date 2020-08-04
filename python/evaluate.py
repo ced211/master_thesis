@@ -2,12 +2,12 @@ import tensorflow as tf
 import numpy as np
 import os
 import json
-from plot_tool import *
-from Processing import *
-from metrics import *
+from python.plot_tool import *
+from python.Processing import *
+from python.metrics import *
 import matplotlib.pyplot as plt
 import scipy
-from train import *
+from python.train import *
 
 
 def _eval(model, gen, folder, sr, plot=False):
@@ -85,23 +85,63 @@ def evaluate(trained_model, config):
         _eval(trained_model, test_generator, folder, sr, plot)
     return
 
+def set_option_eval():
+    parser = argparse.ArgumentParser()
+    help_ = "Path to Checkpoint folder"
+    parser.add_argument("-c", "--ckpt", help=help_)
+    help_ = "Model type. choose between igan or pgan"
+    parser.add_argument("-m", "--model", help=help_)
+    help_ = "path to data"
+    parser.add_argument("-d", "--data", help=help_)
+    help_ = "target directory"
+    parser.add_argument("-t", "--target", help=help_)
+    help_ = "Either to plot the waveform: choose between plot or noplot"
+    parser.add_argument("-p", "--plot", help=help_)
+    help_ = "audio frame length"
+    parser.add_argument("-l", "--length", help=help_)
+    args = parser.parse_args()
+
+    #Default value
+    model_name = 'igan'
+    if args.model:
+        model_name = args.model
+    data = '../fma_dataset/test.tfrecord'
+    if args.data:
+        data = args.data
+    plot = False
+    if args.plot:
+        if args.plot == 'plot':
+            plot = True
+    length = 0.064
+    if args.length:
+        length = args.length
+    target = './reconstruction/' + ckpt[4:] + 'percept_eval/'
+    mkdir(target)
+    if args.target:
+        target = args.target
+    ckpt = 'ckpt/' + model_name + '/0.192/'
+    if args.ckpt:
+        ckpt = args.ckpt
+    return ckpt, data, target, plot, 3*length
+
 if __name__ == "__main__":
-    train_path, val_path, test_path, audio_length, batch_size, log_path, epoch, model_name, ckpt = set_option()
+
+    ckpt, data, target, plot, length = set_option_eval()
     if model_name == 'pgan':
-        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=True)
+        test_pipeline, sr = create_pipeline(data, 256, length, prediction_only=True)
     if model_name == 'igan':
-        test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, prediction_only=False)
-    model = init_model(ckpt, test_pipeline, model_name, log_path)
-    res_dir = 'reconstruction/' + model_name + '/' + str(audio_length) + '/'
+        test_pipeline, sr = create_pipeline(data, 256, length, prediction_only=False)
+    model = init_model(ckpt, test_pipeline, model_name)
+    res_dir = target
     config = {
         'test_generator': test_pipeline,
         'metrics': [snr_batch, tf.keras.losses.mean_squared_error],
         'result_directory': res_dir,
         'loss': tf.keras.losses.mean_squared_error,
-        'plot': True,
+        'plot': plot,
         'sr': sr,
     }
     if model is not None:
         evaluate(model.generator, config)
     else:
-        print("Unknow model type. Exit")
+        print("Unknow model type. Exit")###
