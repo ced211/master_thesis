@@ -1,11 +1,9 @@
-import DataLoader
 import tensorflow as tf
 import argparse
-import IGAN
-import Processing
+from python import IGAN, PGAN, DataLoader, Processing
 import os
 import datetime
-import PGAN
+
 
 def mkdir(path):
     """Create a directory if it doesn't exist. Do nothing Otherwise
@@ -79,11 +77,11 @@ def set_option():
     train_path = '../fma_dataset/train.tfrecord'
     val_path = '../fma_dataset/val.tfrecord'
     test_path = '../fma_dataset/test.tfrecord'
-    audio_length = 3 * 0.064
+    audio_length = 0.064
     batch_size = 256
     epoch = 200
-    log_path = './log/' + model_name + '/' + str(audio_length) + '/'
-    ckpt_path = './ckpt/' + model_name + '/' + str(audio_length) + '/'
+    log_path = '../log/' + model_name + '/' + str(audio_length) + '/'
+    ckpt_path = '../ckpt/' + model_name + '/' + str(audio_length) + '/'
     mkdir(log_path)
     mkdir(ckpt_path)
 
@@ -105,7 +103,7 @@ def set_option():
         epoch = epoch
     if args.ckpt:
         ckpt_path = args.ckpt
-    return train_path, val_path, test_path, audio_length, batch_size, log_path, epoch, model_name, ckpt_path
+    return train_path, val_path, test_path, 3 * audio_length, batch_size, log_path, epoch, model_name, ckpt_path
 
 
 def init_model(ckpt, pipeline, model_name, log_path=None):

@@ -1,9 +1,7 @@
 import tensorflow as tf
-import DataLoader
 import scipy
-import PGAN
-import IGAN
-from train import create_pipeline, init_model, mkdir
+from python import IGAN, PGAN, DataLoader
+from python.train import create_pipeline, init_model, mkdir
 import argparse
 
 

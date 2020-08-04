@@ -2,10 +2,11 @@ import tensorflow as tf
 import numpy as np
 import librosa
 import scipy
-from metrics import log
-from metrics import *
+from python.metrics import log
+from python.metrics import *
 import math
-import SpecgramsHelper
+from python import SpecgramsHelper
+
 
 class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
 

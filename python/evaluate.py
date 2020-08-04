@@ -122,11 +122,11 @@ def set_option_eval():
     ckpt = 'ckpt/' + model_name + '/0.192/'
     if args.ckpt:
         ckpt = args.ckpt
-    return ckpt, data, target, plot, 3*length
+    return ckpt, data, target, plot, 3*length, model_name
 
 if __name__ == "__main__":
 
-    ckpt, data, target, plot, length = set_option_eval()
+    ckpt, data, target, plot, length, model_name = set_option_eval()
     if model_name == 'pgan':
         test_pipeline, sr = create_pipeline(data, 256, length, prediction_only=True)
     if model_name == 'igan':
@@ -144,4 +144,4 @@ if __name__ == "__main__":
     if model is not None:
         evaluate(model.generator, config)
     else:
-        print("Unknow model type. Exit")###
+        print("Unknow model type. Exit")
