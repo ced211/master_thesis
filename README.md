@@ -47,6 +47,7 @@ Arguments:
 1. plot: Whether to plot the spectrum and waveform. Choose between 'plot' and 'noplot'
 1. target: Path to the folder that will contains the newly created waveform and spectrum. If plot='noplot', no file will be created
 1. length: Length of the frame to inpaint/predict in second. Default to 0.064.
+1. batch: Batch size. default to 256
 
 ### Script PerceptualEval
 This script creates sample of 2s long either by filling a gap at 0.5s or by predicting the whole audio by chunk of *length* seconds. The conditioning frame are taken from the original.

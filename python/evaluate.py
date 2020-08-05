@@ -2,12 +2,12 @@ import tensorflow as tf
 import numpy as np
 import os
 import json
-from python.plot_tool import *
-from python.Processing import *
-from python.metrics import *
+from plot_tool import *
+from Processing import *
+from metrics import *
 import matplotlib.pyplot as plt
 import scipy
-from python.train import *
+from train import *
 
 
 def _eval(model, gen, folder, sr, plot=False):
@@ -99,6 +99,8 @@ def set_option_eval():
     parser.add_argument("-p", "--plot", help=help_)
     help_ = "audio frame length"
     parser.add_argument("-l", "--length", help=help_)
+    help_ = "batch size"
+    parser.add_argument("-b", "--batch", type=int, help=help_)
     args = parser.parse_args()
 
     #Default value
@@ -115,22 +117,27 @@ def set_option_eval():
     length = 0.064
     if args.length:
         length = args.length
-    target = './reconstruction/' + ckpt[4:] + 'percept_eval/'
+
+    ckpt = 'ckpt/' + model_name + '/0.064/'
+    if args.ckpt:
+        ckpt = args.ckpt
+    target = '../reconstruction/' + ckpt[4:]
     mkdir(target)
     if args.target:
         target = args.target
-    ckpt = 'ckpt/' + model_name + '/0.192/'
-    if args.ckpt:
-        ckpt = args.ckpt
-    return ckpt, data, target, plot, 3*length, model_name
+
+    batch_size = 256
+    if args.batch:
+        batch_size = args.batch
+    return ckpt, data, target, plot, 3*length, model_name, batch_size
 
 if __name__ == "__main__":
 
-    ckpt, data, target, plot, length, model_name = set_option_eval()
+    ckpt, data, target, plot, length, model_name, batch_size = set_option_eval()
     if model_name == 'pgan':
-        test_pipeline, sr = create_pipeline(data, 256, length, prediction_only=True)
+        test_pipeline, sr = create_pipeline(data, batch_size, length, prediction_only=True)
     if model_name == 'igan':
-        test_pipeline, sr = create_pipeline(data, 256, length, prediction_only=False)
+        test_pipeline, sr = create_pipeline(data, batch_size, length, prediction_only=False)
     model = init_model(ckpt, test_pipeline, model_name)
     res_dir = target
     config = {

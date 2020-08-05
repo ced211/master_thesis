@@ -1,6 +1,6 @@
 import tensorflow as tf
 import argparse
-from python import IGAN, PGAN, DataLoader, Processing
+import IGAN, PGAN, DataLoader, Processing
 import os
 import datetime
 
@@ -62,7 +62,7 @@ def set_option():
     help_ = "path to test data"
     parser.add_argument("-te", "--test", help=help_)
     help_ = "Number of epoch to train"
-    parser.add_argument("-e", "--epoch", help=help_)
+    parser.add_argument("-e", "--epoch", type=int, help=help_)
     help_ = "Path to log folder"
     parser.add_argument("-l", "--log", help=help_)
     help_ = "size of an audio frame in second"
@@ -78,8 +78,8 @@ def set_option():
     val_path = '../fma_dataset/val.tfrecord'
     test_path = '../fma_dataset/test.tfrecord'
     audio_length = 0.064
-    batch_size = 256
-    epoch = 200
+    batch_size = 256#
+    epoch = 100
     log_path = '../log/' + model_name + '/' + str(audio_length) + '/'
     ckpt_path = '../ckpt/' + model_name + '/' + str(audio_length) + '/'
     mkdir(log_path)
@@ -94,13 +94,13 @@ def set_option():
     if args.test:
         test_path = args.test
     if args.size:
-        audio_length = size
+        audio_length = args.size
     if args.batch:
         batch_size = args.batch
     if args.log:
         log_path = args.log
     if args.epoch:
-        epoch = epoch
+        epoch = args.epoch
     if args.ckpt:
         ckpt_path = args.ckpt
     return train_path, val_path, test_path, 3 * audio_length, batch_size, log_path, epoch, model_name, ckpt_path
