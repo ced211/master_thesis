@@ -1,5 +1,5 @@
 import os
-
+import argparse
 import numpy as np
 import librosa
 import tensorflow as tf
@@ -7,14 +7,17 @@ import json
 import csv
 import audioread
 import soundfile
+from train import mkdir
+
 """
 Class to handle conversion from audios to tf record
 """
-class Wav2record:
-    #Desired sample rate
-    target_sr = 16000
-    #desired length of an audio sample in the tfrecord
-    split_duration = 4.0
+class Wav2record():
+
+    def __init__(self, sr=16000, length=4.0):
+        #Desired sample rate
+        self.sample_rate = sr
+        self.split_duration = length
 
     def convert(self, audio):
         """
@@ -34,10 +37,11 @@ class Wav2record:
         Load an audio of arbitrary length and split into chunk of self.split_duration
         """
         try:
-            audio, sr = librosa.load(filepath, self.target_sr)
+            audio, sr = librosa.load(filepath, self.sample_rate)
             split_duration = int(sr * self.split_duration)
             return np.array_split(audio, np.arange(split_duration, len(audio), split_duration))[:-1]
         except FileNotFoundError:
+            print(FileNotFoundError)
             return []
 
     def write_audio(self, audio_path, writer):
@@ -55,14 +59,15 @@ class Wav2record:
         """
         for audio in audios_path:
             try:
-                print("writing file: " + str(audios_path))
+                print("writing file: " + str(audio))
                 self.write_audio(audio, writer)
-            except:
-                print('skipping file')
+            except Exception as e:
+                print('skipping file' + str(audio))
+                print(str(e))
                 pass
 
 
-def parse_maestro(maestro_path):
+def parse_maestro(maestro_meta, maestro_data):
     """
     Parse maestro metadata to know which file belong to which set
     """
@@ -70,29 +75,30 @@ def parse_maestro(maestro_path):
     val_files = []
     test_files = []
     print("Opening json")
-    with open(maestro_path + '/maestro-v2.0.0.json') as json_file:
+    with open(maestro_meta) as json_file:
         data = json.load(json_file)
         for p in data:
             if p['split'] == 'train':
-                train_files.append(maestro_path + p['audio_filename'])
+                train_files.append(maestro_data + p['audio_filename'])
             if p['split'] == 'validation':
-                val_files.append(maestro_path + p['audio_filename'])
+                val_files.append(maestro_data + p['audio_filename'])
             if p['split'] == 'test':
-                test_files.append(maestro_path + p['audio_filename'])
+                test_files.append(maestro_data + p['audio_filename'])
     return train_files, val_files, test_files
 
-def parse_fma(fma_path):
+def parse_fma(fma_meta, fma_data):
     "Parse fma metadata to know which file belong to which set"
     train_file = []
     val_file = []
     test_file = []
-    with open(fma_path, 'r', encoding='utf-8') as csvfile:
+    with open(fma_meta, 'r', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             if row[32] == 'small':
-                print(row[32] + ', ' + row[31] + ' id: ' + row[0])
                 name = row[0].zfill(6)
-                file_path = '../fma_dataset/fma_dataset/' + name + '.wav'
+                print("NAME:")
+                print(name)
+                file_path = fma_data + '/' + name[:3] + '/' + name + '.mp3'
                 if row[31] == 'training':
                     train_file.append(file_path)
                 elif row[31] == 'validation':
@@ -110,7 +116,7 @@ if __name__ == "__main__":
     help_ = "Dataset name. Either fma or maestro "
     parser.add_argument('name', help=help_)
     help_ = "Path of the target directory"
-    parser.add_argument('target', help=help_)
+    parser.add_argument('-t', '--target', help=help_)
     help_ = "Desired sampling rate"
     parser.add_argument("-sr", "--sampling_rate", type=int, help=help_)
     help_ = "Record duration in second"
@@ -120,26 +126,34 @@ if __name__ == "__main__":
 
     duration = 4.0
     sr = 16000
+    target = '../' + args.name  + '_dataset' + '/'
+    if args.target:
+        print("hello")
+        target = args.target
     if args.sampling_rate:
-        sr = sampling_rate
+        sr = args.sampling_rate
     if args.duration:
         duration = args.duration
 
-    train_writer = tf.io.TFRecordWriter(args.target + "/train.tfrecord")
-    val_writer = tf.io.TFRecordWriter(args.target + "/val.tfrecord")
-    test_writer = tf.io.TFRecordWriter(args.target + "/val.tfrecord")
-    default_writer = tf.io.TFRecordWriter(args.target)
+    mkdir(target)
+    train_writer = tf.io.TFRecordWriter(target + "/train.tfrecord")
+    val_writer = tf.io.TFRecordWriter(target + "/val.tfrecord")
+    test_writer = tf.io.TFRecordWriter(target + "/test.tfrecord")
 
-    train_file, val_file, test_file = None
-    worker = Wav2record()
+    train_file, val_file, test_file = (None, None, None)
+    worker = Wav2record(sr, duration)
     if args.name == 'fma':
-        train_file, val_file, test_file = parse_fma(args.meta)
+        train_file, val_file, test_file = parse_fma(args.meta, args.dataset)
     if args.name == 'maestro':
-        train_file, val_file, test_file = parse_maestro(args.meta)
+        train_file, val_file, test_file = parse_maestro(args.meta, args.dataset)
     if train_file is not None:
+        print("Writing validation set")
         worker.write_audios(val_file, val_writer)
+        print("Writing test set")
         worker.write_audios(test_file, test_writer)
+        print("Writing training set")
         worker.write_audios(train_file, train_writer)
     else:
+        default_writer = tf.io.TFRecordWriter(args.target)
         worker.write_audios(args.daataset, default_writer)
 
