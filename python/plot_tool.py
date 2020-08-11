@@ -21,10 +21,12 @@ def plot_audios(rec_audio_batch, true_audio_batch, out_folder, hole=None):
     for i in range(len(rec_audio_batch)):
         rec_audio = rec_audio_batch[i]
         true_audio = true_audio_batch[i]
-        hole_audio = hole[i]
         path = out_folder + 'rec_vs_original_audio_sample_' + str(i) + '.png'
-        plot_audio(rec_audio, true_audio, path, hole_audio)
-
+        if hole is not None:
+            hole_audio = hole[i]
+            plot_audio(rec_audio, true_audio, path, hole_audio)
+        else:
+            plot_audio(rec_audio, true_audio, path)
 def plot_spectrum_pred(rec_spec, true_spec, path, sr, hop_length):
     rec_spec = np.swapaxes(rec_spec, 0, 1)
     true_spec = np.swapaxes(true_spec, 0, 1)

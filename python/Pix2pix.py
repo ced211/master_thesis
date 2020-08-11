@@ -106,9 +106,7 @@ class Pix2Pix:
         prev_frame = tf.keras.layers.Input(shape=input_shape, name='prev_image', batch_size=batch_size)
         next_frame = tf.keras.layers.Input(shape=input_shape, name='next_image', batch_size=batch_size)
         gap_frame = tf.keras.layers.Input(shape=target_shape, name='target_image', batch_size=batch_size)
-        print("prev frame: " + str(tf.shape(prev_frame)))
-        print("gap frame: " + str(tf.shape(gap_frame)))
-        print("next frame: " + str(tf.shape(next_frame)))
+
 
         x = tf.keras.layers.concatenate([prev_frame, gap_frame, next_frame], axis=1)
         base = 32
@@ -134,7 +132,6 @@ class Pix2Pix:
     def train_step(self, prev_frame, gap_frame, next_frame, epoch):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
             gen_output = self.generator([prev_frame, next_frame], training=True)
-            print("en output shape: " + str(gen_output.shape))
             disc_real_output = self.discriminator([ prev_frame, gap_frame, next_frame], training=True)
             disc_generated_output = self.discriminator([ prev_frame, gen_output, next_frame], training=True)
             gen_total_loss, gen_gan_loss, gen_l1_loss = self.generator_loss(disc_generated_output, gen_output, gap_frame)
@@ -183,7 +180,7 @@ if __name__ == '__main__':
     train_path = 'nsynth-test.tfrecord'
     val_path = 'nsynth-test.tfrecord'
     test_path = 'nsynth-test.tfrecord'
-    audio_length = 0.064
+    audio_length = 0.064 * 3
     batch_size = 256
     epoch = 100
     log_path = '../log/' + model_name + '/' + str(audio_length) + '/'
@@ -200,23 +197,23 @@ if __name__ == '__main__':
     test_pipeline, sr = create_pipeline(test_path, batch_size, audio_length, False)
 
     (prev_frame, next_frame), y = test_pipeline.__getitem__(1)
-    print("y shape: " + str(tf.shape(y)))
-    print("y shape: " + str(y.shape[1:]))
     pix2pix = Pix2Pix(list(tf.shape(y)[1:]), list(tf.shape(y)[1:]), ckpt_path, batch_size, summary_writer, fig_path=fig_path, base=32)
     tf.keras.utils.plot_model(pix2pix.generator, 'pix2pix_gen.png', expand_nested=True, show_shapes=True)
     tf.keras.utils.plot_model(pix2pix.discriminator, 'pix2pix_discr.png', expand_nested=True, show_shapes=True)
 
     #Training
     pix2pix.restore()
-    pix2pix.fit(train_pipeline, 100, val_pipeline, 0)
+    #pix2pix.fit(train_pipeline, 100, val_pipeline, 0)
+    res_dir = '../reconstruction/' + model_name + '/'
+    mkdir(res_dir)
 
-    pix2pix.generator.load_weights(checkpoint_dir + 'gen/')
     #Evaluate the GAN
     config = {
         'test_generator': test_pipeline,
-        'metrics': [ tf.keras.losses.mean_squared_error,  test_pipeline.snr ],
+        'metrics': [ tf.keras.losses.mean_squared_error,  snr_batch],
         'result_directory': res_dir,
         'loss': tf.keras.losses.mean_squared_error,
+        'sr': sr
     }
     evaluate(pix2pix.generator, config)
 
