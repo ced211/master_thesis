@@ -2,10 +2,9 @@ import tensorflow as tf
 import numpy as np
 import librosa
 import scipy
-from python.metrics import log
-from python.metrics import *
+from metrics import *
 import math
-from python import SpecgramsHelper
+import SpecgramsHelper
 
 
 class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
@@ -75,12 +74,12 @@ class Processeur(SpecgramsHelper.SpecgramsHelper, tf.keras.utils.Sequence):
             if not self.get_audio:
                 return (specs1, specs3), specs2
             else:
-                return (specs1, specs3), specs2, audio2
+                return (specs1, specs3), specs2, audio_batch
         else:
             if not self.get_audio:
                 return specs1, specs2
             else:
-                return specs1, specs2, audio2
+                return specs1, specs2, audio_batch
 
     def __len__(self):
         """Return the number of batch in one epoch

@@ -24,12 +24,13 @@ def _eval(model, gen, folder, sr, plot=False):
     SNR_audio = []
     for i in range(len(gen)):
         x, y, true_audio = gen.__getitem__(0)
+        true_audio = true_audio.numpy()
+        prev_audio = np.squeeze(true_audio[:, :gen.audio_length])
+        gap_audio = np.squeeze(true_audio[:, gen.audio_length: 2 * gen.audio_length])
+        next_audio = np.squeeze(true_audio[:, 2 * gen.audio_length: 3 * gen.audio_length])
         pred = model.predict_on_batch(x)
-        print("writing batch " + str(i))
-        rec_audio = gen.to_audio(pred)
-        print('rec audio shape')
-        print(rec_audio.shape)
-        SNR_audio.append(snr_audio_batch(np.squeeze(true_audio), np.squeeze(rec_audio)))
+        rec_audio = np.squeeze(gen.to_audio(pred))
+        SNR_audio.append(snr_audio_batch(gap_audio, np.squeeze(rec_audio)))
         if plot:
             prefix = folder + 'batch_' + str(i) + '_'
             if gen.prediction:
@@ -40,8 +41,10 @@ def _eval(model, gen, folder, sr, plot=False):
                 predicted = np.concatenate((prev, pred, next), axis=1)
                 truth = np.concatenate((prev, y, next), axis=1)
             plot_spectrums(predicted, truth, prefix, sr, gen._nhop, gen.prediction)
-            plot_audios(rec_audio, true_audio.numpy(), prefix)
-            write_audio_batch(rec_audio, true_audio.numpy(), prefix, gen.sr)
+            plot_audios(rec_audio, gap_audio, prefix)
+            rec_audio = np.concatenate((prev_audio, rec_audio, next_audio), axis=1)
+            hole_audio = np.concatenate((prev_audio, np.zeros(gap_audio.shape), next_audio), axis=1)
+            write_audio_batch(rec_audio, true_audio, prefix, gen.sr, hole=hole_audio)
 
     SNR_audio = np.stack(SNR_audio)
     plt.hist(SNR_audio)
@@ -98,7 +101,7 @@ def set_option_eval():
     help_ = "Either to plot the waveform: choose between plot or noplot"
     parser.add_argument("-p", "--plot", help=help_)
     help_ = "audio frame length"
-    parser.add_argument("-l", "--length", help=help_)
+    parser.add_argument("-l", "--length", type=float, help=help_)
     help_ = "batch size"
     parser.add_argument("-b", "--batch", type=int, help=help_)
     args = parser.parse_args()

@@ -6,21 +6,24 @@ from librosa.display import specshow
 import librosa
 
 
-def plot_audio(rec_audio, true_audio, path):
+def plot_audio(rec_audio, true_audio, path, hole_audio=None):
     fig, ax = plt.subplots()
     ax.plot(np.arange(true_audio.size), true_audio, 'b-', label='true_audio')
     ax.plot(np.arange(rec_audio.size), rec_audio, 'r-', label='reconstruction')
+    if hole_audio is not None:
+        ax.plot(np.arange(hole_audio.size), hole_audio, 'g-', label='hole')
     plt.legend()
     plt.savefig(path)
     plt.close()
 
 
-def plot_audios(rec_audio_batch, true_audio_batch, out_folder):
+def plot_audios(rec_audio_batch, true_audio_batch, out_folder, hole=None):
     for i in range(len(rec_audio_batch)):
         rec_audio = rec_audio_batch[i]
         true_audio = true_audio_batch[i]
+        hole_audio = hole[i]
         path = out_folder + 'rec_vs_original_audio_sample_' + str(i) + '.png'
-        plot_audio(rec_audio, true_audio, path)
+        plot_audio(rec_audio, true_audio, path, hole_audio)
 
 def plot_spectrum_pred(rec_spec, true_spec, path, sr, hop_length):
     rec_spec = np.swapaxes(rec_spec, 0, 1)
@@ -32,10 +35,10 @@ def plot_spectrum_pred(rec_spec, true_spec, path, sr, hop_length):
     plt.ylabel("Time in sample")
     ax1, ax2 = axes
     ax1.set_title("reconstruction")
-    specshow(librosa.amplitude_to_db(rec_spec, ref=np.max), ax=ax1, sr=sr, hop_length=hop_length, y_axis='linear',
+    specshow(librosa.amplitude_to_db(rec_spec, ref=np.max), ax=ax1, sr=sr, hop_length=hop_length*0.75, y_axis='linear',
              x_axis='s')
     ax2.set_title("ground truth")
-    specshow(librosa.amplitude_to_db(true_spec, ref=np.max), ax=ax2, sr=sr, hop_length=hop_length, y_axis='linear',
+    specshow(librosa.amplitude_to_db(true_spec, ref=np.max), ax=ax2, sr=sr, hop_length=hop_length*0.75, y_axis='linear',
              x_axis='s')
     plt.savefig(path)
     plt.close()
@@ -50,10 +53,10 @@ def plot_spectrum_inp(rec_spec, true_spec, path, sr, hop_length):
     plt.ylabel("Time in sample")
     ax3, ax1, ax2 = axes
     ax1.set_title("reconstruction")
-    specshow(librosa.amplitude_to_db(rec_spec, ref=np.max), ax=ax1, sr=sr, hop_length=hop_length, y_axis='linear',
+    specshow(librosa.amplitude_to_db(rec_spec, ref=np.max), ax=ax1, sr=sr, hop_length=hop_length*0.75, y_axis='linear',
              x_axis='s')
     ax2.set_title("ground truth")
-    specshow(librosa.amplitude_to_db(true_spec, ref=np.max), ax=ax2, sr=sr, hop_length=hop_length, y_axis='linear',
+    specshow(librosa.amplitude_to_db(true_spec, ref=np.max), ax=ax2, sr=sr, hop_length=hop_length*0.75, y_axis='linear',
              x_axis='s')
     ax3.set_title("hole")
     time_idx = true_spec.shape[1] // 3
@@ -77,7 +80,10 @@ def plot_spectrums(rec_spec_batch, true_spec_batch, out_folder, sr, hop_length, 
             plot_spectrum_inp(rec_spec_batch[i], true_spec_batch[i], path, sr, hop_length)
 
 
-def write_audio_batch(rec_audios, true_audios, out_folder, sr):
+def write_audio_batch(rec_audios, true_audios, out_folder, sr, hole=None):
     for i in range(rec_audios.shape[0]):
         scipy.io.wavfile.write(out_folder + 'rec_sample_' + str(i) + '.wav', sr, rec_audios[i])
         scipy.io.wavfile.write(out_folder + 'or_sample_' + str(i) + '.wav', sr, true_audios[i])
+        if hole is not None:
+            scipy.io.wavfile.write(out_folder + 'hole_sample_' + str(i) + '.wav', sr, hole[i])
+

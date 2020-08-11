@@ -51,20 +51,36 @@ class Percept_eval():
             if write_hole:
                 tf.io.write_file(self.res_dir + 'hole_' + 'batch_' + str(batch_idx) + '_sample_' + str(i) + '.wav', or_hole[i])
 
-    def prediction_chaining(self, dataset, gen):
-        batch_idx = 0
+    def prediction_chaining(self, dataset, gen, length):
+        idx = 0
+        length = int(length)
+        print(length)
         for audio_batch in dataset:
-            print("audio batch shape : " + str(audio_batch.shape))
-            batch_spec = gen.process_data(audio_batch)
-            predictions = tf.map_fn(self.pred_spec_chaining, batch_spec)
-            reconstructed_audio = gen.to_audio(predictions)
-            reconstructed_audio = tf.squeeze(reconstructed_audio)
-            idx0 = self.slice_size * gen._nhop
-            idx1 = audio_batch.shape[1] - self.slice_size * gen._nhop - gen._nhop * (
-                    batch_spec[0].shape[0] % self.slice_size)
-            audio_batch = audio_batch[:, idx0:idx1]
-            self.write_batch(reconstructed_audio, audio_batch, batch_idx, False)
-            batch_idx += 1
+            for i in range(audio_batch.shape[0]):
+                audio = audio_batch[i, :]
+                to_keep = int(audio.shape[0] - (audio.shape[0] % length))
+                audio = audio[:to_keep]
+                splitted_audio = tf.stack(tf.split(audio, int(audio.shape[0] // length), 0))
+                prev_audio_frame = tf.reshape(splitted_audio[:-2], (-1, length))
+                next_audio_frame = tf.reshape(splitted_audio[2:], (-1, length))
+                print("prev_audio frame shape: " + str(prev_audio_frame.shape))
+                print("next_audio frame shape: " + str(next_audio_frame.shape))
+                prev_frame = gen.process_data(prev_audio_frame)
+                next_frame = gen.process_data(next_audio_frame)
+                print("prev_frame shape: " + str(prev_frame.shape))
+                print("next frame shape: " + str(next_frame.shape))
+                predic_spec = self.model.predict((prev_frame, next_frame))
+                print("predic shape " + str(predic_spec.shape))
+                predic_audio =  gen.to_audio(predic_spec)
+                print("predic_audio shape: " + str(predic_audio.shape))
+                audio = tf.expand_dims(audio[length:-length], -1)
+                rec_audio = tf.reshape(predic_audio, audio.shape)
+                print("rec_audio shape: " + str(rec_audio.shape))
+                rec_audio = self.encode(rec_audio)
+                audio = self.encode(audio)
+                tf.io.write_file(self.res_dir + 'or_chaining_' + str(idx) + '.wav', audio)
+                tf.io.write_file(self.res_dir + 'rec_chaining_' + str(idx) + '.wav', rec_audio)
+                idx += 1
 
     def eval_on_1_hole(self, dataset, gen, length):
         hole_start_idx = int(0.5 * self.sr)
@@ -102,8 +118,8 @@ if __name__ == '__main__':
     parser.add_argument("-t", "--target", help=help_)
     help_ = "Evaluation type: choose between chaining or single_hole"
     parser.add_argument("-me", "--method", help=help_)
-    help_ = "audio frame length"
-    parser.add_argument("-l", "--length", help=help_)
+    help_ = "audio frame length in second"
+    parser.add_argument("-l", "--length", type=float, help=help_)
     help_ = "batch size"
     parser.add_argument("-b", "--batch", type=int, help=help_)
     args = parser.parse_args()
@@ -111,7 +127,7 @@ if __name__ == '__main__':
     batch_size = 256
     if args.batch:
         batch_size = args.batch
-    model_name = 'pgan'
+    model_name = 'igan'
     if args.model:
         model_name = args.model
     data = '../fma_dataset/test.tfrecord'
@@ -130,7 +146,7 @@ if __name__ == '__main__':
     pipeline = None
     sr= 16000
     split_ckpt = ckpt.split('/')
-    audio_length = float(split_ckpt[2])
+    audio_length = 0.064
     if args.length:
         audio_length = args.length
     if model_name == 'igan':
@@ -139,9 +155,9 @@ if __name__ == '__main__':
         pipeline, sr = create_pipeline(data, batch_size, 3*audio_length, prediction_only=True)
     model = init_model(ckpt, pipeline, model_name)
     evaluator = Percept_eval(model, target, sr)
-    dataloader = DataLoader.LoadData(data, repeat=False, audio_frame_length=2.01, batch_size=batch_size)
+    dataloader = DataLoader.LoadData(data, repeat=False, audio_frame_length=2.220, batch_size=batch_size)
     dataset = dataloader.create_dataset()
     if method == 'chaining':
-        evaluator.prediction_chaining(dataset, pipeline)
+        evaluator.prediction_chaining(dataset, pipeline, length=audio_length*sr)
     if method == 'single_hole':
         evaluator.eval_on_1_hole(dataset, pipeline, length=audio_length)
